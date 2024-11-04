@@ -67,33 +67,58 @@ def plot_fluence(results_path):
     # each of the photon packet numbers are split into different subplots
     # `results_path` is a Path object to the simulation run's absorbance results
 
+    # just hardcode the specific sim params, eventually track this in json
+    ma = 0.1       # [cm-1]
+    # ms = 100       # [cm-1]
+    # mt = ma + ms   # [cm-1]
+    Nz = 200 
+    # Nr = int(Nz / 3)
+    # Da = 0.005
+    Dz = 0.005
+    x = np.linspace(0, 0 + (Nz - 1) * Dz, Nz)
+
     photon_nums = [1000, 10000, 100000, 1000000]
+
+    fig, axes = plt.subplots(2, 2)
+    axes = axes.flatten()
     
-    for num in photon_nums:
+    for i, num in enumerate(photon_nums):
 
         n_rel0 = 1.0
         n_rel1 = 1.37
 
         A_str0 = f"A_{num}packets_1-0n0_1-0n1.npy"
-        zgb_str0 = f"zgb_{num}packets_1-0n0_1-0n1.npy"
-        rgb_str0 = f"rgb_{num}packets_1-0n0_1-0n1.npy"
+        # zgb_str0 = f"zgb_{num}packets_1-0n0_1-0n1.npy"
+        # rgb_str0 = f"rgb_{num}packets_1-0n0_1-0n1.npy"
         A_str1 = f"A_{num}packets_1-0n0_1-37n1.npy"
-        zgb_str1 = f"zgb_{num}packets_1-0n0_1-37n1.npy"
-        rgb_str1 = f"rgb_{num}packets_1-0n0_1-37n1.npy"
+        # zgb_str1 = f"zgb_{num}packets_1-0n0_1-37n1.npy"
+        # rgb_str1 = f"rgb_{num}packets_1-0n0_1-37n1.npy"
 
         A_0 = np.load(results_path.joinpath(A_str0))
-        zgb_0 = np.load(results_path.joinpath(zgb_str0))
-        rgb_0 = np.load(results_path.joinpath(rgb_str0))
+        # zgb_0 = np.load(results_path.joinpath(zgb_str0))
+        # rgb_0 = np.load(results_path.joinpath(rgb_str0))
         A_1 = np.load(results_path.joinpath(A_str1))
-        zgb_1 = np.load(results_path.joinpath(zgb_str1))
-        rgb_1 = np.load(results_path.joinpath(rgb_str1))
+        # zgb_1 = np.load(results_path.joinpath(zgb_str1))
+        # rgb_1 = np.load(results_path.joinpath(rgb_str1))
 
+        Az_0 = np.sum(A_0, axis=1)
+        Az_norm0 = Az_0 / ( Nz * Dz )
+        Fz_0 = Az_norm0 / ma
+        Az_1 = np.sum(A_1, axis=1)
+        Az_norm1 = Az_1 / ( Nz * Dz )
+        Fz_1 = Az_norm1 / ma
 
+        ax = axes[i]
+        ax.plot(x, Fz_0, label=str(n_rel0))
+        ax.plot(x, Fz_1, label=str(n_rel1))
+        ax.set_yscale('log')
+        ax.set_xlabel('z [cm]')
+        ax.set_ylabel('Fluence [-]')
+        ax.set_title(f"{num} packets")
 
-
-        
-    
-
+    fig.legend()
+    fig.suptitle("Comparisons of Internal Fluences as a Function of Depth")
+    plt.show()
 
 
 """
