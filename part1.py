@@ -3,7 +3,8 @@ from pathlib import Path
 from time import time
 
 
-OUTPUT_DIR = "/home/apc6353/Documents/school/bme333/simulation_outputs"
+# OUTPUT_DIR = "/home/apc6353/Documents/school/bme333/simulation_outputs"
+OUTPUT_DIR = r"C:\Users\Andy\OneDrive - Northwestern University\Documents\_Year 4\1st Quarter\BME 333\assignments\mc\simulation_results"
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
+from tqdm import tqdm
 
 
 DEBUG = False
@@ -73,13 +74,15 @@ def plot_fluence(results_path):
     # mt = ma + ms   # [cm-1]
     Nz = 200 
     # Nr = int(Nz / 3)
-    # Da = 0.005
+    # ir = np.arange(Nr)
     Dz = 0.005
+    # Dr = 0.005
+    # Da = 2 * np.pi * ( ir + 0.5 ) * Dr ** 2
     x = np.linspace(0, 0 + (Nz - 1) * Dz, Nz)
 
     photon_nums = [1000, 10000, 100000, 1000000]
 
-    fig, axes = plt.subplots(2, 2)
+    fig, axes = plt.subplots(2, 2, figsize=(8, 8))
     axes = axes.flatten()
     
     for i, num in enumerate(photon_nums):
@@ -87,10 +90,10 @@ def plot_fluence(results_path):
         n_rel0 = 1.0
         n_rel1 = 1.37
 
-        A_str0 = f"A_{num}packets_1-0n0_1-0n1.npy"
+        A_str0 = f"A_{num}packets_1-0n0_1-0n1-npy.npy"
         # zgb_str0 = f"zgb_{num}packets_1-0n0_1-0n1.npy"
         # rgb_str0 = f"rgb_{num}packets_1-0n0_1-0n1.npy"
-        A_str1 = f"A_{num}packets_1-0n0_1-37n1.npy"
+        A_str1 = f"A_{num}packets_1-0n0_1-37n1-npy.npy"
         # zgb_str1 = f"zgb_{num}packets_1-0n0_1-37n1.npy"
         # rgb_str1 = f"rgb_{num}packets_1-0n0_1-37n1.npy"
 
@@ -102,22 +105,29 @@ def plot_fluence(results_path):
         # rgb_1 = np.load(results_path.joinpath(rgb_str1))
 
         Az_0 = np.sum(A_0, axis=1)
-        Az_norm0 = Az_0 / ( Nz * Dz )
+        Az_norm0 = Az_0 / ( num * Dz )
         Fz_0 = Az_norm0 / ma
         Az_1 = np.sum(A_1, axis=1)
-        Az_norm1 = Az_1 / ( Nz * Dz )
+        Az_norm1 = Az_1 / ( num * Dz )
         Fz_1 = Az_norm1 / ma
 
         ax = axes[i]
-        ax.plot(x, Fz_0, label=str(n_rel0))
-        ax.plot(x, Fz_1, label=str(n_rel1))
+        # ax.plot(x, Fz_0, label=f"$n$={n_rel0}")
+        # ax.plot(x, Fz_1, label=f"$n$={n_rel1}")
+        # ax.plot(x[:-1], Fz_0[:-1], label=f"$n$={n_rel0}")
+        # ax.plot(x[:-1], Fz_1[:-1], label=f"$n$={n_rel1}")
+        ax.plot(x[:-1], Fz_0[:-1], label="$n_{rel}$=1")
+        ax.plot(x[:-1], Fz_1[:-1], label="$n_{rel}$=1.37")
         ax.set_yscale('log')
         ax.set_xlabel('z [cm]')
         ax.set_ylabel('Fluence [-]')
         ax.set_title(f"{num} packets")
 
-    fig.legend()
+        if i == 0:
+            ax.legend()
+
     fig.suptitle("Comparisons of Internal Fluences as a Function of Depth")
+    plt.tight_layout()
     plt.show()
 
 
@@ -334,8 +344,8 @@ class Simulation:
 
     def run_sim(self):
         # launch each of the photon packets
-        # for launch in tqdm(range(num_trials)):
-        for launch in range(self.num_trials):
+        for launch in tqdm(range(self.num_trials)):
+        # for launch in range(self.num_trials):
             if DEBUG: 
                 print(f"Photon {launch}")
 
