@@ -59,15 +59,9 @@ def zr_absorbance_matrix(Nz, Nr):
 
 def xyz_absorbance_matrix(Nx, Ny, Nz):
     # create an (x, y, z) absorbance matrix
-    return np.zeros((Nx, Ny, Nz))
+    return np.zeros((Nz, Nr))
 
 def get_absorbance_loc(p, res, Nz, Nr):
-    # return a tuple indicating the correct spot in the absorbance array (with shape [Nz,Nr]) for the given photon p, at the grid line separation res
-    z = int( p.loc.z / res )
-    r = int( np.sqrt( p.loc.x ** 2 + p.loc.y ** 2 ) / res )
-    return ( min(z, Nz-1), min(r, Nr-1) )
-
-def get_zr_absorbance_loc(p, res, Nz, Nr):
     # return a tuple indicating the correct spot in the absorbance array (with shape [Nz,Nr]) for the given photon p, at the grid line separation res
     z = int( p.loc.z / res )
     r = int( np.sqrt( p.loc.x ** 2 + p.loc.y ** 2 ) / res )
@@ -172,37 +166,18 @@ class Direction:
 
 
 class Photon:
-    def __init__(
-            self, 
-            Nx=-1,
-            Ny=-1,
-            Nz=-1,
-            Nr=-1,
-            output_dir=None
-    ) -> None:
-        self.weight = 1.0                           # current size of the photon packet
-        self.dir = Direction(0.0, 0.0, 1.0)         # current direction of the photon
-        self.s = 0.0                                # step size (dimensionless)
-        self.dead = False                           # status of the photon size
-        self.outofbounds = False                    # status of the photon location
-        self.Nx = Nx                                # number of elements in the x dimension
-        self.Ny = Ny                                # number of elements in the y dimension
-        self.Nz = Nz                                # number of elements in the z dimension
-        self.Nr = Nr                                # number of elements in the r dimension
-        self.res = 0.0001                           # [cm], cell resolution for absorbance (hardcoded for 10% of mean free path)
-        self.rmin = 0                               # [cm], min distance in r dim
-        self.xmin = self.res                        # [cm], min distance in x dim
-        self.ymin = self.res                        # [cm], min distance in y dim
-        self.zmin = 0                               # [cm], min distance in z dim
-        self.rmax = self.Nr * self.res + self.rmin  # [cm], max distance in r dim
-        self.xmax = self.Nx * self.res + self.xmin  # [cm], max distance in x dim
-        self.ymax = self.Ny * self.res + self.ymin  # [cm], max distance in y dim
-        self.zmax = self.Nz * self.res + self.zmin  # [cm], max distance in z dim
-        # calculate the initial entry position of the photon packet
-        x0 = ( self.xmax - self.xmin ) / 2 + self.xmin
-        y0 = ( self.ymax - self.ymin ) / 2 + self.ymin
-        z0 = 0.0
-        self.loc = Location(x0, y0, z0)             # current coordinate of the photon 
+    def __init__(self):
+        self.weight = 1.0                       # current size of the photon packet
+        self.loc = Location(0.0, 0.0, 0.0)      # current coordinate of the photon 
+        self.dir = Direction(0.0, 0.0, 1.0)     # current direction of the photon
+        self.s = 0.0                            # step size (dimensionless)
+        self.dead = False                       # status of the photon size
+        self.outofbounds = False                # status of the photon location
+        self.Nz = 200                           # number of elements in the z dimension
+        self.Nr = 66                            # number of elements in the r dimension
+        self.res = 0.005                        # [cm], cell resolution for absorbance
+        self.zmax = ( self.Nz - 1 ) * self.res  # [cm], max distance in z dim
+        self.rmax = ( self.Nr - 1 ) * self.res  # [cm], max distance in r dim
 
     def __str__(self):
         return f"""
@@ -253,7 +228,7 @@ class Photon:
             print(f"quantity inside arcsin is {( ni / nt ) * np.sin( ai )}")
         at = np.arcsin( ( ni / nt ) * np.sin( ai ) )
         crit_angle = np.arcsin( nt / ni )
-        if (ni > nt) and (crit_angle == crit_angle) and (ai > crit_angle):
+        if ni > nt and ai > crit_angle:
             # local reflectance equals unity
             Ri = 1
         else:
@@ -292,46 +267,6 @@ class Photon:
             self.dir.my = num / den + my * cos_theta
 
             self.dir.mz = - np.sqrt( 1 - mz ** 2 ) * sin_theta * cos_phi + mz * cos_theta
-
-    def deposit_weight_3d(self, w, A):
-        # distribute weight w into the absorbance array A based on the photon's current location.
-        # if outside of the tracked area, but the photon weight into the appropriate bin
-        # I'll try this one without inverse distance weighting, which is what the paper does 
-        x = self.loc.x
-        y = self.loc.y
-        z = self.loc.z
-        p = (x, y, z)
-
-        # calculate the x coordinate index
-        if x < self.xmin:
-            ix = 0
-        elif x > self.xmax:
-            ix = -1
-        else:
-            # x is in bounds
-            ix = int( x / self.res )
-
-        # calculate the y coordinate index
-        if y < self.ymin:
-            iy = 0
-        elif y > self.ymax:
-            iy = -1
-        else:
-            # y is in bounds
-            iy = int( y / self.res )
-
-        # calculate the z coordinate index (we shouldn't need to check zmin)
-        if y > self.ymax:
-            iz = -1
-        else:
-            # z is in bounds
-            iz = int( z / self.res )
-
-        if DEBUG:
-            print(f"\t\tx={x}, y={y}, z={z}")
-
-        A[ix, iy, iz] += w
-
 
     def deposit_weight(self, w, A, z_gb, r_gb):
         # distribute weight w into the absorbance array A based on the photon's current location.
@@ -388,7 +323,7 @@ class Photon:
             A[iz, ir+1] += w * c_tr
             A[iz+1, ir+1] += w * c_br
             A[iz+1, ir] += w * c_bl
-    
+
 
 class Simulation:
     def __init__(
@@ -400,10 +335,8 @@ class Simulation:
             Ny=-1,
             Nz=-1,
             Nr=-1,
-            output_dir=None,
-            incident_angle=0,
+            output_dir=None
     ) -> None:
-        self.perp = Nr != -1
         self.num_trials = num_trials
         self.n0 = n0
         self.n1 = n1
@@ -416,20 +349,19 @@ class Simulation:
         self.Wth = 0.0001
         self.m = 10
         self.dzr = 0.005
-        self.dxyz = 0.005
         self.Nx = Nx
         self.Ny = Ny
         self.Nz = Nz
         self.Nr = Nr
-        self.incident_angle = incident_angle
-        if self.perp:
-            self.A = zr_absorbance_matrix(self.Nz, self.Nr)
-            self.r_gb = np.zeros(self.Nz)
+        if self.Nr == -1:
+            # this is how I'll know that I'm running a non-pencil simulation
+            pass
         else:
-            self.A = xyz_absorbance_matrix(self.Nx + 2, self.Ny + 2, self.Nz + 1)
-            # self.x_gb = np.zeros(self.Nz)
-            # self.y_gb = np.zeros(self.Ny)
-            # self.z_gb = np.zeros(self.Nr)
+            self.A = absorbance_matrix(self.Nz, self.Nr)
+        self.x_gb = np.zeros(self.Nz)
+        self.y_gb = np.zeros(self.Ny)
+        self.z_gb = np.zeros(self.Nr)
+        self.r_gb = np.zeros(self.Nz)
 
     def __str__(self):
         return f"""
@@ -438,34 +370,15 @@ class Simulation:
 
     def run_sim(self):
         # launch each of the photon packets
-        # for launch in tqdm(range(self.num_trials)):
-        for launch in range(self.num_trials):
+        for launch in tqdm(range(self.num_trials)):
+        # for launch in range(self.num_trials):
             if DEBUG: 
                 print(f"Photon {launch}")
 
             photon = Photon()
-            
-            if self.perp:
-                # specular reflectance
-                photon.weight -= self.Rsp
-            else:
-                # snell & fresnal
-                # calculate the updated direction based on angle of incidence
-                # encode the angle of incidence into the direction cosines
-                # I think we just need to change mu_x, mu_z
-                # (since we assume no y component)
-                photon.dir.mx = np.sin( self.incident_angle )
-                photon.dir.mz = np.cos( self.incident_angle )
 
-                # calculate reflectance & reduce weight accordingly
-                R = photon.get_reflectance(ni=self.n0, nt=self.n1)
-                photon.weight -= R 
-
-                # calculate newly refracted angle theta2 & update dir
-                # ( use snell)
-                theta2 = np.arcsin ( self.n0 / self.n1 * np.sin( self.incident_angle ) )
-                photon.dir.mx = np.sin( theta2 )
-                photon.dir.mz = np.cos( theta2 )
+            # specular reflectance
+            photon.weight -= self.Rsp
 
             count = 0
             # photon travel loop
@@ -513,8 +426,7 @@ class Simulation:
                     # increase absorbance weight
                     if DEBUG:
                         print("\t\tcalling deposit:") 
-                    # photon.deposit_weight(delta_W, self.A, self.z_gb, self.r_gb)
-                    photon.deposit_weight_3d(delta_W, self.A)
+                    photon.deposit_weight(delta_W, self.A, self.z_gb, self.r_gb)
 
                     # scatter
                     cos_theta = sample_cos_theta(self.g)
